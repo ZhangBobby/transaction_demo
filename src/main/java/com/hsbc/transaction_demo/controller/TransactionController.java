@@ -7,7 +7,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,15 +35,15 @@ public class TransactionController {
     }
 
     @GetMapping
-    @Operation(summary = "Get all transactions")
-    public ResponseEntity<List<TransactionDTO>> getAllTransactions() {
-        return ResponseEntity.ok(service.getAllTransactions());
-    }
-
-    @GetMapping("/page")
-    @Operation(summary = "Get transactions with pagination")
-    public ResponseEntity<Page<TransactionDTO>> getTransactionsPage(Pageable pageable) {
-        return ResponseEntity.ok(service.getAllTransactions(pageable));
+    @Operation(summary = "Get all transactions with pagination")
+    public ResponseEntity<Page<TransactionDTO>> getAllTransactions(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "timestamp") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDirection) {
+        Sort.Direction direction = Sort.Direction.fromString(sortDirection);
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(direction, sortBy));
+        return ResponseEntity.ok(service.getAllTransactions(pageRequest));
     }
 
     @PutMapping("/{id}")

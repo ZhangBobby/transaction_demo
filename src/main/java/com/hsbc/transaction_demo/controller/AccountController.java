@@ -7,6 +7,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -37,9 +40,15 @@ public class AccountController {
     }
 
     @GetMapping
-    @Operation(summary = "Get all accounts")
-    public ResponseEntity<List<AccountDTO>> getAllAccounts() {
-        return ResponseEntity.ok(service.getAllAccounts());
+    @Operation(summary = "Get all accounts with pagination")
+    public ResponseEntity<Page<AccountDTO>> getAllAccounts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "accountNumber") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDirection) {
+        Sort.Direction direction = Sort.Direction.fromString(sortDirection);
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(direction, sortBy));
+        return ResponseEntity.ok(service.getAllAccounts(pageRequest));
     }
 
     @PutMapping("/{accountNumber}")

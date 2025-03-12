@@ -5,6 +5,9 @@ import com.hsbc.transaction_demo.exception.AccountException;
 import com.hsbc.transaction_demo.model.Account;
 import com.hsbc.transaction_demo.repository.AccountRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,6 +68,20 @@ public class AccountService {
         return repository.findAll().stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
+    }
+
+    public Page<AccountDTO> getAllAccounts(Pageable pageable) {
+        List<Account> accounts = repository.findAll();
+        
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), accounts.size());
+        
+        List<AccountDTO> pageContent = accounts.subList(start, end)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+        
+        return new PageImpl<>(pageContent, pageable, accounts.size());
     }
 
     @Transactional

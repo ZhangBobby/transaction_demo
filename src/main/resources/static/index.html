@@ -65,6 +65,18 @@
                 <!-- Transaction list -->
                 <div class="transaction-list">
                     <h3>Transaction List</h3>
+                    <div class="mb-3">
+                        <div class="row">
+                            <div class="col-md-2">
+                                <select class="form-select" id="transactionPageSize">
+                                    <option value="5">5 条/页</option>
+                                    <option value="10" selected>10 条/页</option>
+                                    <option value="20">20 条/页</option>
+                                    <option value="50">50 条/页</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                     <table class="table">
                         <thead>
                             <tr>
@@ -80,6 +92,10 @@
                         <tbody id="transactionTableBody">
                         </tbody>
                     </table>
+                    <nav>
+                        <ul class="pagination justify-content-center" id="transactionPagination">
+                        </ul>
+                    </nav>
                 </div>
             </div>
 
@@ -109,6 +125,18 @@
                 <!-- Account list -->
                 <div class="account-list">
                     <h3>Account List</h3>
+                    <div class="mb-3">
+                        <div class="row">
+                            <div class="col-md-2">
+                                <select class="form-select" id="accountPageSize">
+                                    <option value="5">5 条/页</option>
+                                    <option value="10" selected>10 条/页</option>
+                                    <option value="20">20 条/页</option>
+                                    <option value="50">50 条/页</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                     <table class="table">
                         <thead>
                             <tr>
@@ -122,6 +150,10 @@
                         <tbody id="accountTableBody">
                         </tbody>
                     </table>
+                    <nav>
+                        <ul class="pagination justify-content-center" id="accountPagination">
+                        </ul>
+                    </nav>
                 </div>
             </div>
         </div>
@@ -131,69 +163,148 @@
         const TRANSACTION_API_URL = '/api/transactions';
         const ACCOUNT_API_URL = '/api/accounts';
 
-        // Load all transactions
+        // 交易分页状态
+        let transactionState = {
+            page: 0,
+            size: 10,
+            sortBy: 'timestamp',
+            sortDirection: 'desc',
+            totalPages: 0
+        };
+
+        // Load transactions
         async function loadTransactions() {
             try {
-                const response = await fetch(TRANSACTION_API_URL);
+                console.log('Loading transactions with params:', transactionState);
+                const response = await fetch(`${TRANSACTION_API_URL}?page=${transactionState.page}&size=${transactionState.size}&sortBy=${transactionState.sortBy}&sortDirection=${transactionState.sortDirection}`);
+                
+                const responseData = await response.json();
+                console.log('Server response for transactions:', responseData);
+
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to load transactions');
+                    throw new Error(responseData.message || '加载交易列表失败');
                 }
-                const transactions = await response.json();
+                
+                // 处理非分页格式的响应
+                let transactions;
+                if (Array.isArray(responseData)) {
+                    // 如果是数组，说明是非分页格式
+                    transactions = responseData;
+                    // 计算总页数
+                    transactionState.totalPages = Math.ceil(transactions.length / transactionState.size);
+                    // 根据当前页码和每页大小截取数据
+                    const start = transactionState.page * transactionState.size;
+                    const end = start + transactionState.size;
+                    transactions = transactions.slice(start, end);
+                } else if (responseData && Array.isArray(responseData.content)) {
+                    // 如果是分页格式
+                    transactions = responseData.content;
+                    transactionState.totalPages = responseData.totalPages || Math.ceil(transactions.length / transactionState.size);
+                } else {
+                    console.error('Invalid response format:', responseData);
+                    transactionState.totalPages = 0;
+                    const tableBody = document.getElementById('transactionTableBody');
+                    tableBody.innerHTML = '<tr><td colspan="7" class="text-center">暂无交易记录</td></tr>';
+                    updateTransactionPagination();
+                    return;
+                }
+                
                 const tableBody = document.getElementById('transactionTableBody');
                 tableBody.innerHTML = '';
                 
-                transactions.forEach(transaction => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${transaction.accountNumber}</td>
-                        <td>${transaction.targetAccountNumber}</td>
-                        <td>${transaction.amount}</td>
-                        <td>${transaction.description || '-'}</td>
-                        <td>${getStatusText(transaction.status)}</td>
-                        <td>${new Date(transaction.timestamp).toLocaleString()}</td>
-                        <td>
-                            <button class="btn btn-sm btn-info" onclick="editTransaction('${transaction.id}')">Edit</button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteTransaction('${transaction.id}')">Delete</button>
-                        </td>
-                    `;
-                    tableBody.appendChild(row);
-                });
+                if (transactions.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="7" class="text-center">暂无交易记录</td></tr>';
+                } else {
+                    transactions.forEach(transaction => {
+                        console.log('Processing transaction:', transaction);
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${transaction.accountNumber || '-'}</td>
+                            <td>${transaction.targetAccountNumber || '-'}</td>
+                            <td>${transaction.amount || 0}</td>
+                            <td>${transaction.description || '-'}</td>
+                            <td>${getStatusText(transaction.status)}</td>
+                            <td>${transaction.timestamp ? new Date(transaction.timestamp).toLocaleString() : '-'}</td>
+                            <td>
+                                <button class="btn btn-sm btn-info" onclick="editTransaction('${transaction.id}')">编辑</button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteTransaction('${transaction.id}')">删除</button>
+                            </td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                }
+
+                updateTransactionPagination();
             } catch (error) {
                 console.error('Load transactions error:', error);
-                alert(error.message || 'Failed to load transactions');
+                const tableBody = document.getElementById('transactionTableBody');
+                tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">加载交易列表失败</td></tr>';
+                transactionState.totalPages = 0;
+                updateTransactionPagination();
             }
         }
 
-        // Load all accounts
+        // 账户分页状态
+        let accountState = {
+            page: 0,
+            size: 10,
+            sortBy: 'accountNumber',
+            sortDirection: 'asc',
+            totalPages: 0
+        };
+
+        // 加载账户列表
         async function loadAccounts() {
             try {
-                const response = await fetch(ACCOUNT_API_URL);
+                const response = await fetch(`${ACCOUNT_API_URL}?page=${accountState.page}&size=${accountState.size}&sortBy=${accountState.sortBy}&sortDirection=${accountState.sortDirection}`);
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(errorData.message || 'Failed to load accounts');
                 }
-                const accounts = await response.json();
+                const data = await response.json();
+                
+                // 检查返回的数据格式
+                if (!data || !Array.isArray(data.content)) {
+                    console.error('Invalid response format:', data);
+                    accountState.totalPages = 0;
+                    const tableBody = document.getElementById('accountTableBody');
+                    tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No accounts found</td></tr>';
+                    updateAccountPagination();
+                    return;
+                }
+
+                const accounts = data.content;
+                accountState.totalPages = data.totalPages || 1;
+                
                 const tableBody = document.getElementById('accountTableBody');
                 tableBody.innerHTML = '';
                 
-                accounts.forEach(account => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${account.accountNumber}</td>
-                        <td>${account.username || '-'}</td>
-                        <td>${account.balance}</td>
-                        <td>${new Date(account.createdAt).toLocaleString()}</td>
-                        <td>
-                            <button class="btn btn-sm btn-info" onclick="editAccount('${account.accountNumber}')">Edit</button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteAccount('${account.accountNumber}')">Delete</button>
-                        </td>
-                    `;
-                    tableBody.appendChild(row);
-                });
+                if (accounts.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No accounts found</td></tr>';
+                } else {
+                    accounts.forEach(account => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${account.accountNumber || '-'}</td>
+                            <td>${account.username || '-'}</td>
+                            <td>${account.balance || 0}</td>
+                            <td>${account.createdAt ? new Date(account.createdAt).toLocaleString() : '-'}</td>
+                            <td>
+                                <button class="btn btn-sm btn-info" onclick="editAccount('${account.accountNumber}')">Edit</button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteAccount('${account.accountNumber}')">Delete</button>
+                            </td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                }
+
+                updateAccountPagination();
             } catch (error) {
                 console.error('Load accounts error:', error);
-                alert(error.message || 'Failed to load accounts');
+                const tableBody = document.getElementById('accountTableBody');
+                tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Failed to load accounts</td></tr>';
+                accountState.totalPages = 0;
+                updateAccountPagination();
             }
         }
 
@@ -218,6 +329,7 @@
             };
 
             try {
+                console.log('Saving transaction:', transaction);
                 const url = transactionId ? `${TRANSACTION_API_URL}/${transactionId}` : TRANSACTION_API_URL;
                 const method = transactionId ? 'PUT' : 'POST';
                 
@@ -229,18 +341,21 @@
                     body: JSON.stringify(transaction)
                 });
 
+                const responseData = await response.json();
+                console.log('Server response:', responseData);
+
                 if (response.ok) {
                     resetTransactionForm();
-                    // Refresh both transaction list and account list
+                    // 强制重置为第一页并刷新列表
+                    transactionState.page = 0;
                     await Promise.all([loadTransactions(), loadAccounts()]);
-                    alert('Transaction saved successfully');
+                    alert('交易保存成功');
                 } else {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to save transaction');
+                    throw new Error(responseData.message || '保存交易失败');
                 }
             } catch (error) {
                 console.error('Transaction error:', error);
-                alert(error.message || 'Failed to save transaction');
+                alert(error.message || '保存交易失败');
             }
         }
 
@@ -377,6 +492,179 @@
         // Add event listeners
         document.getElementById('transactionForm').addEventListener('submit', saveTransaction);
         document.getElementById('accountForm').addEventListener('submit', saveAccount);
+
+        // 更新分页控件
+        function updateAccountPagination() {
+            const pagination = document.getElementById('accountPagination');
+            pagination.innerHTML = '';
+
+            // Previous button
+            const prevLi = document.createElement('li');
+            prevLi.className = `page-item ${accountState.page === 0 ? 'disabled' : ''}`;
+            prevLi.innerHTML = `<a class="page-link" href="#" onclick="event.preventDefault(); changePage(${accountState.page - 1})">上一页</a>`;
+            pagination.appendChild(prevLi);
+
+            // 计算要显示的页码范围
+            const currentPage = accountState.page;
+            const totalPages = accountState.totalPages;
+            const maxVisiblePages = 5; // 最多显示的页码数
+            
+            let startPage = Math.max(0, currentPage - Math.floor(maxVisiblePages / 2));
+            let endPage = Math.min(totalPages - 1, startPage + maxVisiblePages - 1);
+            
+            // 调整startPage，确保显示足够的页码
+            if (endPage - startPage + 1 < maxVisiblePages) {
+                startPage = Math.max(0, endPage - maxVisiblePages + 1);
+            }
+
+            // First page and ellipsis
+            if (startPage > 0) {
+                pagination.appendChild(createPageItem(0, '1'));
+                if (startPage > 1) {
+                    const ellipsis = document.createElement('li');
+                    ellipsis.className = 'page-item disabled';
+                    ellipsis.innerHTML = '<span class="page-link">...</span>';
+                    pagination.appendChild(ellipsis);
+                }
+            }
+
+            // Page numbers
+            for (let i = startPage; i <= endPage; i++) {
+                pagination.appendChild(createPageItem(i, i + 1));
+            }
+
+            // Last page and ellipsis
+            if (endPage < totalPages - 1) {
+                if (endPage < totalPages - 2) {
+                    const ellipsis = document.createElement('li');
+                    ellipsis.className = 'page-item disabled';
+                    ellipsis.innerHTML = '<span class="page-link">...</span>';
+                    pagination.appendChild(ellipsis);
+                }
+                pagination.appendChild(createPageItem(totalPages - 1, totalPages));
+            }
+
+            // Next button
+            const nextLi = document.createElement('li');
+            nextLi.className = `page-item ${accountState.page >= accountState.totalPages - 1 ? 'disabled' : ''}`;
+            nextLi.innerHTML = `<a class="page-link" href="#" onclick="event.preventDefault(); changePage(${accountState.page + 1})">下一页</a>`;
+            pagination.appendChild(nextLi);
+
+            // 显示当前页码信息
+            const pageInfo = document.createElement('li');
+            pageInfo.className = 'page-item disabled';
+            pageInfo.innerHTML = `<span class="page-link">第 ${accountState.page + 1} 页，共 ${accountState.totalPages} 页</span>`;
+            pagination.appendChild(pageInfo);
+        }
+
+        // 创建页码按钮
+        function createPageItem(pageIndex, label) {
+            const li = document.createElement('li');
+            li.className = `page-item ${pageIndex === accountState.page ? 'active' : ''}`;
+            li.innerHTML = `<a class="page-link" href="#" onclick="event.preventDefault(); changePage(${pageIndex})">${label}</a>`;
+            return li;
+        }
+
+        // 切换页码
+        function changePage(newPage) {
+            if (newPage >= 0 && newPage < accountState.totalPages) {
+                accountState.page = newPage;
+                loadAccounts();
+            }
+        }
+
+        // 监听分页和排序控件变化
+        document.getElementById('accountPageSize').addEventListener('change', function(e) {
+            accountState.size = parseInt(e.target.value);
+            accountState.page = 0;
+            loadAccounts();
+        });
+
+        // 更新交易分页控件
+        function updateTransactionPagination() {
+            const pagination = document.getElementById('transactionPagination');
+            pagination.innerHTML = '';
+
+            // Previous button
+            const prevLi = document.createElement('li');
+            prevLi.className = `page-item ${transactionState.page === 0 ? 'disabled' : ''}`;
+            prevLi.innerHTML = `<a class="page-link" href="#" onclick="event.preventDefault(); changeTransactionPage(${transactionState.page - 1})">上一页</a>`;
+            pagination.appendChild(prevLi);
+
+            // 计算要显示的页码范围
+            const currentPage = transactionState.page;
+            const totalPages = transactionState.totalPages;
+            const maxVisiblePages = 5;
+            
+            let startPage = Math.max(0, currentPage - Math.floor(maxVisiblePages / 2));
+            let endPage = Math.min(totalPages - 1, startPage + maxVisiblePages - 1);
+            
+            if (endPage - startPage + 1 < maxVisiblePages) {
+                startPage = Math.max(0, endPage - maxVisiblePages + 1);
+            }
+
+            // First page and ellipsis
+            if (startPage > 0) {
+                pagination.appendChild(createTransactionPageItem(0, '1'));
+                if (startPage > 1) {
+                    const ellipsis = document.createElement('li');
+                    ellipsis.className = 'page-item disabled';
+                    ellipsis.innerHTML = '<span class="page-link">...</span>';
+                    pagination.appendChild(ellipsis);
+                }
+            }
+
+            // Page numbers
+            for (let i = startPage; i <= endPage; i++) {
+                pagination.appendChild(createTransactionPageItem(i, i + 1));
+            }
+
+            // Last page and ellipsis
+            if (endPage < totalPages - 1) {
+                if (endPage < totalPages - 2) {
+                    const ellipsis = document.createElement('li');
+                    ellipsis.className = 'page-item disabled';
+                    ellipsis.innerHTML = '<span class="page-link">...</span>';
+                    pagination.appendChild(ellipsis);
+                }
+                pagination.appendChild(createTransactionPageItem(totalPages - 1, totalPages));
+            }
+
+            // Next button
+            const nextLi = document.createElement('li');
+            nextLi.className = `page-item ${transactionState.page >= transactionState.totalPages - 1 ? 'disabled' : ''}`;
+            nextLi.innerHTML = `<a class="page-link" href="#" onclick="event.preventDefault(); changeTransactionPage(${transactionState.page + 1})">下一页</a>`;
+            pagination.appendChild(nextLi);
+
+            // 显示当前页码信息
+            const pageInfo = document.createElement('li');
+            pageInfo.className = 'page-item disabled';
+            pageInfo.innerHTML = `<span class="page-link">第 ${transactionState.page + 1} 页，共 ${transactionState.totalPages} 页</span>`;
+            pagination.appendChild(pageInfo);
+        }
+
+        // 创建交易页码按钮
+        function createTransactionPageItem(pageIndex, label) {
+            const li = document.createElement('li');
+            li.className = `page-item ${pageIndex === transactionState.page ? 'active' : ''}`;
+            li.innerHTML = `<a class="page-link" href="#" onclick="event.preventDefault(); changeTransactionPage(${pageIndex})">${label}</a>`;
+            return li;
+        }
+
+        // 切换交易页码
+        function changeTransactionPage(newPage) {
+            if (newPage >= 0 && newPage < transactionState.totalPages) {
+                transactionState.page = newPage;
+                loadTransactions();
+            }
+        }
+
+        // 监听交易分页和排序控件变化
+        document.getElementById('transactionPageSize').addEventListener('change', function(e) {
+            transactionState.size = parseInt(e.target.value);
+            transactionState.page = 0;
+            loadTransactions();
+        });
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

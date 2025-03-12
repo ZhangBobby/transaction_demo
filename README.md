@@ -47,7 +47,7 @@ DELETE /api/transactions/{id}     - 删除交易
 
 1. 克隆项目
 ```bash
-git clone [项目地址]
+git clone 
 ```
 
 2. 进入项目目录
