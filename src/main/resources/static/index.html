@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transaction Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .transaction-form, .account-form {
+            max-width: 600px;
+            margin: 20px auto;
+        }
+        .transaction-list, .account-list {
+            margin-top: 40px;
+        }
+        .nav-tabs {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mt-4">Transaction Management System</h1>
+        
+        <!-- Navigation tabs -->
+        <ul class="nav nav-tabs" id="myTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="transactions-tab" data-bs-toggle="tab" data-bs-target="#transactions" type="button" role="tab">Transaction Management</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="accounts-tab" data-bs-toggle="tab" data-bs-target="#accounts" type="button" role="tab">Account Management</button>
+            </li>
+        </ul>
+
+        <!-- Tab content -->
+        <div class="tab-content" id="myTabContent">
+            <!-- Transaction management tab -->
+            <div class="tab-pane fade show active" id="transactions" role="tabpanel">
+                <!-- Transaction form -->
+                <div class="transaction-form">
+                    <h3>Add/Edit Transaction</h3>
+                    <form id="transactionForm">
+                        <input type="hidden" id="transactionId">
+                        <div class="mb-3">
+                            <label for="accountNumber" class="form-label">Source Account</label>
+                            <input type="text" class="form-control" id="accountNumber" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="targetAccountNumber" class="form-label">Target Account</label>
+                            <input type="text" class="form-control" id="targetAccountNumber" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="amount" class="form-label">Amount</label>
+                            <input type="number" step="0.01" class="form-control" id="amount" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description</label>
+                            <input type="text" class="form-control" id="description">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <button type="button" class="btn btn-secondary" onclick="resetTransactionForm()">Reset</button>
+                    </form>
+                </div>
+
+                <!-- Transaction list -->
+                <div class="transaction-list">
+                    <h3>Transaction List</h3>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Source Account</th>
+                                <th>Target Account</th>
+                                <th>Amount</th>
+                                <th>Description</th>
+                                <th>Status</th>
+                                <th>Time</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Account management tab -->
+            <div class="tab-pane fade" id="accounts" role="tabpanel">
+                <!-- Account form -->
+                <div class="account-form">
+                    <h3>Add/Edit Account</h3>
+                    <form id="accountForm">
+                        <div class="mb-3">
+                            <label for="newAccountNumber" class="form-label">Account Number</label>
+                            <input type="text" class="form-control" id="newAccountNumber" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="balance" class="form-label">Balance</label>
+                            <input type="number" step="0.01" class="form-control" id="balance" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <button type="button" class="btn btn-secondary" onclick="resetAccountForm()">Reset</button>
+                    </form>
+                </div>
+
+                <!-- Account list -->
+                <div class="account-list">
+                    <h3>Account List</h3>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Account Number</th>
+                                <th>Username</th>
+                                <th>Balance</th>
+                                <th>Created Time</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="accountTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const TRANSACTION_API_URL = '/api/transactions';
+        const ACCOUNT_API_URL = '/api/accounts';
+
+        // Load all transactions
+        async function loadTransactions() {
+            try {
+                const response = await fetch(TRANSACTION_API_URL);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to load transactions');
+                }
+                const transactions = await response.json();
+                const tableBody = document.getElementById('transactionTableBody');
+                tableBody.innerHTML = '';
+                
+                transactions.forEach(transaction => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${transaction.accountNumber}</td>
+                        <td>${transaction.targetAccountNumber}</td>
+                        <td>${transaction.amount}</td>
+                        <td>${transaction.description || '-'}</td>
+                        <td>${getStatusText(transaction.status)}</td>
+                        <td>${new Date(transaction.timestamp).toLocaleString()}</td>
+                        <td>
+                            <button class="btn btn-sm btn-info" onclick="editTransaction('${transaction.id}')">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteTransaction('${transaction.id}')">Delete</button>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Load transactions error:', error);
+                alert(error.message || 'Failed to load transactions');
+            }
+        }
+
+        // Load all accounts
+        async function loadAccounts() {
+            try {
+                const response = await fetch(ACCOUNT_API_URL);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to load accounts');
+                }
+                const accounts = await response.json();
+                const tableBody = document.getElementById('accountTableBody');
+                tableBody.innerHTML = '';
+                
+                accounts.forEach(account => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${account.accountNumber}</td>
+                        <td>${account.username || '-'}</td>
+                        <td>${account.balance}</td>
+                        <td>${new Date(account.createdAt).toLocaleString()}</td>
+                        <td>
+                            <button class="btn btn-sm btn-info" onclick="editAccount('${account.accountNumber}')">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteAccount('${account.accountNumber}')">Delete</button>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Load accounts error:', error);
+                alert(error.message || 'Failed to load accounts');
+            }
+        }
+
+        function getStatusText(status) {
+            const statusMap = {
+                'PENDING': 'Pending',
+                'COMPLETED': 'Completed',
+                'FAILED': 'Failed'
+            };
+            return statusMap[status] || status;
+        }
+
+        // Save transaction
+        async function saveTransaction(event) {
+            event.preventDefault();
+            const transactionId = document.getElementById('transactionId').value;
+            const transaction = {
+                accountNumber: document.getElementById('accountNumber').value,
+                targetAccountNumber: document.getElementById('targetAccountNumber').value,
+                amount: parseFloat(document.getElementById('amount').value),
+                description: document.getElementById('description').value
+            };
+
+            try {
+                const url = transactionId ? `${TRANSACTION_API_URL}/${transactionId}` : TRANSACTION_API_URL;
+                const method = transactionId ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(transaction)
+                });
+
+                if (response.ok) {
+                    resetTransactionForm();
+                    // Refresh both transaction list and account list
+                    await Promise.all([loadTransactions(), loadAccounts()]);
+                    alert('Transaction saved successfully');
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to save transaction');
+                }
+            } catch (error) {
+                console.error('Transaction error:', error);
+                alert(error.message || 'Failed to save transaction');
+            }
+        }
+
+        // Save account
+        async function saveAccount(event) {
+            event.preventDefault();
+            const account = {
+                accountNumber: document.getElementById('newAccountNumber').value,
+                username: document.getElementById('username').value,
+                balance: parseFloat(document.getElementById('balance').value)
+            };
+
+            try {
+                const response = await fetch(ACCOUNT_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(account)
+                });
+
+                if (response.ok) {
+                    resetAccountForm();
+                    loadAccounts();
+                    alert('Account saved successfully');
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to save account');
+                }
+            } catch (error) {
+                console.error('Account error:', error);
+                alert(error.message || 'Failed to save account');
+            }
+        }
+
+        // Edit transaction
+        async function editTransaction(id) {
+            try {
+                const response = await fetch(`${TRANSACTION_API_URL}/${id}`);
+                const transaction = await response.json();
+                
+                document.getElementById('transactionId').value = transaction.id;
+                document.getElementById('accountNumber').value = transaction.accountNumber;
+                document.getElementById('targetAccountNumber').value = transaction.targetAccountNumber;
+                document.getElementById('amount').value = transaction.amount;
+                document.getElementById('description').value = transaction.description || '';
+            } catch (error) {
+                console.error('Failed to load transaction details:', error);
+                alert('Failed to load transaction details');
+            }
+        }
+
+        // Edit account
+        async function editAccount(accountNumber) {
+            try {
+                const response = await fetch(`${ACCOUNT_API_URL}/${accountNumber}`);
+                const account = await response.json();
+                
+                document.getElementById('newAccountNumber').value = account.accountNumber;
+                document.getElementById('username').value = account.username || '';
+                document.getElementById('balance').value = account.balance;
+            } catch (error) {
+                console.error('Failed to load account details:', error);
+                alert('Failed to load account details');
+            }
+        }
+
+        // Delete transaction
+        async function deleteTransaction(id) {
+            if (!confirm('Are you sure you want to delete this transaction?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${TRANSACTION_API_URL}/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    // Refresh both transaction list and account list
+                    await Promise.all([loadTransactions(), loadAccounts()]);
+                    alert('Transaction deleted successfully');
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to delete transaction');
+                }
+            } catch (error) {
+                console.error('Delete transaction error:', error);
+                alert(error.message || 'Failed to delete transaction');
+            }
+        }
+
+        // Delete account
+        async function deleteAccount(accountNumber) {
+            if (!confirm('Are you sure you want to delete this account?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${ACCOUNT_API_URL}/${accountNumber}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    loadAccounts();
+                    alert('Account deleted successfully');
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to delete account');
+                }
+            } catch (error) {
+                console.error('Delete account error:', error);
+                alert(error.message || 'Failed to delete account');
+            }
+        }
+
+        // Reset transaction form
+        function resetTransactionForm() {
+            document.getElementById('transactionId').value = '';
+            document.getElementById('transactionForm').reset();
+        }
+
+        // Reset account form
+        function resetAccountForm() {
+            document.getElementById('newAccountNumber').value = '';
+            document.getElementById('username').value = '';
+            document.getElementById('balance').value = '';
+        }
+
+        // Initial load
+        loadTransactions();
+        loadAccounts();
+
+        // Add event listeners
+        document.getElementById('transactionForm').addEventListener('submit', saveTransaction);
+        document.getElementById('accountForm').addEventListener('submit', saveAccount);
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 
