@@ -98,6 +98,8 @@ mvn test -Dtest=AccountControllerTest
 ### 测试报告
 测试执行后，可以在 `target/surefire-reports` 目录下查看详细的测试报告。
 
+### 压测报告
+压力测试采用Jemeter对新增用户接口以及读取用户列表的接口进行读写压力测试，测试报告以及脚本在`testplan`文件夹中找到。
 
 ## 注意事项
 
