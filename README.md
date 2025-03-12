@@ -47,7 +47,7 @@ DELETE /api/transactions/{id}     - 删除交易
 
 1. 克隆项目
 ```bash
-git clone [项目地址]
+git clone https://github.com/ZhangBobby/transaction_demo.git
 ```
 
 2. 进入项目目录
@@ -83,8 +83,6 @@ http://localhost:8080
    ```
    
  
-
-
 ## 测试
 
 项目包含完整的单元测试和集成测试：
