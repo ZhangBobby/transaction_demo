@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -100,15 +102,21 @@ class AccountControllerTest {
                 .build();
 
         List<AccountDTO> accounts = Arrays.asList(testAccount, anotherAccount);
-        when(accountService.getAllAccounts()).thenReturn(accounts);
+        when(accountService.getAllAccounts(any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(accounts));
 
         mockMvc.perform(get("/api/accounts"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].accountNumber").value("1234567890"))
-                .andExpect(jsonPath("$[0].balance").value("1000.00"))
-                .andExpect(jsonPath("$[1].accountNumber").value("0987654321"))
-                .andExpect(jsonPath("$[1].balance").value("2000.00"));
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[0].accountNumber").value("1234567890"))
+                .andExpect(jsonPath("$.content[0].balance").value("1000.00"))
+                .andExpect(jsonPath("$.content[1].accountNumber").value("0987654321"))
+                .andExpect(jsonPath("$.content[1].balance").value("2000.00"))
+                .andExpect(jsonPath("$.totalElements").exists())
+                .andExpect(jsonPath("$.totalPages").exists())
+                .andExpect(jsonPath("$.size").exists())
+                .andExpect(jsonPath("$.number").exists());
     }
 
     @Test

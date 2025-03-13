@@ -9,12 +9,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -111,15 +114,22 @@ class TransactionControllerTest {
                 .amount(new BigDecimal("200.00"))
                 .build();
 
-        when(transactionService.getAllTransactions())
-                .thenReturn(Arrays.asList(testTransaction, anotherTransaction));
+        List<TransactionDTO> transactions = Arrays.asList(testTransaction, anotherTransaction);
+        when(transactionService.getAllTransactions(any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(transactions));
 
         mockMvc.perform(get("/api/transactions"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(testId.toString()))
-                .andExpect(jsonPath("$[1].accountNumber").value("0987654321"));
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[0].id").value(testId.toString()))
+                .andExpect(jsonPath("$.content[1].accountNumber").value("0987654321"))
+                .andExpect(jsonPath("$.totalElements").exists())
+                .andExpect(jsonPath("$.totalPages").exists())
+                .andExpect(jsonPath("$.size").exists())
+                .andExpect(jsonPath("$.number").exists());
 
-        verify(transactionService).getAllTransactions();
+        verify(transactionService).getAllTransactions(any(PageRequest.class));
     }
 
     // Update operation tests
